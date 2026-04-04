@@ -287,6 +287,150 @@ body {
 
 .empty-state { text-align: center; color: var(--text2); padding: 40px 20px; font-size: 13px; }
 .empty-icon { font-size: 36px; margin-bottom: 10px; }
+
+/* Guide Me */
+.guide-fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 200;
+  background: linear-gradient(135deg, var(--accent), #2a9d6a);
+  color: var(--bg);
+  border: none;
+  border-radius: 50px;
+  padding: 12px 20px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 20px rgba(61,186,126,0.35);
+  transition: all .25s;
+}
+.guide-fab:hover { transform: translateY(-2px); box-shadow: 0 6px 28px rgba(61,186,126,0.45); }
+.guide-fab.active { background: var(--red); box-shadow: 0 4px 20px rgba(224,95,95,0.35); }
+.guide-fab .pulse-dot {
+  width: 8px; height: 8px; background: var(--bg); border-radius: 50%;
+  animation: guidePulse 1.8s ease infinite;
+}
+.guide-fab.active .pulse-dot { display: none; }
+@keyframes guidePulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .5; transform: scale(1.4); } }
+
+.guide-overlay {
+  position: fixed;
+  bottom: 80px;
+  right: 24px;
+  z-index: 199;
+  width: 340px;
+  max-height: 480px;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 16px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+  animation: guideSlideUp .3s ease;
+}
+.guide-overlay.open { display: flex; }
+@keyframes guideSlideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+.guide-header {
+  padding: 14px 16px;
+  background: linear-gradient(135deg, rgba(61,186,126,0.15), rgba(245,166,35,0.08));
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.guide-header-icon { font-size: 20px; }
+.guide-header-text { flex: 1; }
+.guide-header-title { font-family: 'Fraunces', serif; font-size: 14px; font-weight: 600; color: var(--accent); }
+.guide-header-sub { font-size: 11px; color: var(--text2); margin-top: 1px; }
+
+.guide-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 16px;
+}
+.guide-body::-webkit-scrollbar { width: 4px; }
+.guide-body::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 4px; }
+
+.guide-step {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+  animation: fadeUp .3s ease;
+}
+.guide-step-num {
+  width: 24px; height: 24px;
+  background: var(--accent);
+  color: var(--bg);
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.guide-step-num.done { background: var(--text2); }
+.guide-step-content { font-size: 13px; line-height: 1.5; color: var(--text); }
+.guide-step-content strong { color: var(--accent); }
+
+.guide-highlight {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 3px;
+  border-radius: 8px;
+  animation: guideGlow 1.5s ease infinite;
+  position: relative;
+  z-index: 50;
+}
+@keyframes guideGlow { 0%,100% { outline-color: var(--accent); } 50% { outline-color: var(--accent2); } }
+
+.guide-actions { padding: 10px 16px; border-top: 1px solid var(--border); display: flex; gap: 8px; }
+.guide-action-btn {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 8px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .2s;
+  text-align: center;
+}
+.guide-action-btn:hover { border-color: var(--accent); color: var(--accent); }
+.guide-action-btn.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.guide-action-btn.primary:hover { opacity: .85; }
+
+.guide-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text2);
+  font-size: 13px;
+  padding: 20px 0;
+}
+
+.guide-context-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(61,186,126,0.1);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 10px;
+  color: var(--accent);
+  font-weight: 500;
+  margin-bottom: 12px;
+}
 </style>
 </head>
 <body>
@@ -734,6 +878,296 @@ function toggleCheck(id) {
 
 updateChecklist();
 document.getElementById('zip-input').addEventListener('keydown', e => { if (e.key === 'Enter') searchClinics(); });
+
+// ── Guide Me: Simulated Screen Awareness ──
+
+let guideActive = false;
+let guideGoal = null;
+
+function getUIState() {
+  const activeTab = document.querySelector('.tab.active .t')?.dataset[currentLang] ||
+                    document.querySelector('.tab.active .t')?.textContent || 'unknown';
+  const activePanel = document.querySelector('.panel.active')?.id?.replace('panel-', '') || 'unknown';
+
+  const state = { activeTab, activePanel, lang: currentLang };
+
+  if (activePanel === 'clinics') {
+    const zip = document.getElementById('zip-input').value.trim();
+    const hasResults = document.querySelector('.clinic-card') !== null;
+    const clinicCount = document.querySelectorAll('.clinic-card').length;
+    const impactVisible = document.getElementById('impact-box').classList.contains('visible');
+    state.clinics = { zip, hasResults, clinicCount, impactVisible };
+  }
+
+  if (activePanel === 'chat') {
+    const msgCount = document.querySelectorAll('.msg').length;
+    const lastMsg = document.querySelector('.msg:last-child .bubble')?.textContent?.slice(0, 100) || '';
+    const inputText = document.getElementById('chat-input').value.trim();
+    state.chat = { msgCount, lastMsg, inputText, isThinking };
+  }
+
+  if (activePanel === 'prep') {
+    const concern = document.getElementById('concern-select').value;
+    const totalChecks = document.querySelectorAll('.checklist-item').length;
+    const checkedCount = document.querySelectorAll('.check-box.checked').length;
+    state.prep = { concern, totalChecks, checkedCount };
+  }
+
+  if (activePanel === 'data') {
+    state.data = { viewing: true };
+  }
+
+  return state;
+}
+
+function toggleGuide() {
+  guideActive = !guideActive;
+  const fab = document.getElementById('guide-fab');
+  const overlay = document.getElementById('guide-overlay');
+
+  if (guideActive) {
+    fab.classList.add('active');
+    fab.innerHTML = `✕ <span class="t" data-es="Cerrar Guía" data-en="Close Guide">${currentLang === 'es' ? 'Cerrar Guía' : 'Close Guide'}</span>`;
+    overlay.classList.add('open');
+    showGuideGoalPicker();
+  } else {
+    fab.classList.remove('active');
+    fab.innerHTML = `<span class="pulse-dot"></span> <span class="t" data-es="Guíame" data-en="Guide Me">${currentLang === 'es' ? 'Guíame' : 'Guide Me'}</span>`;
+    overlay.classList.remove('open');
+    guideGoal = null;
+    clearHighlights();
+  }
+}
+
+function clearHighlights() {
+  document.querySelectorAll('.guide-highlight').forEach(el => el.classList.remove('guide-highlight'));
+}
+
+function showGuideGoalPicker() {
+  const body = document.getElementById('guide-body');
+  const isEs = currentLang === 'es';
+  body.innerHTML = `
+    <div style="font-size:13px;color:var(--text2);margin-bottom:14px">${isEs ? '¿Qué quieres hacer hoy?' : 'What do you want to do today?'}</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="guide-action-btn" onclick="startGuide('find_clinic')" style="text-align:left;padding:12px">
+        📍 ${isEs ? 'Encontrar una clínica cerca de mí' : 'Find a clinic near me'}
+      </button>
+      <button class="guide-action-btn" onclick="startGuide('ask_health')" style="text-align:left;padding:12px">
+        💬 ${isEs ? 'Preguntar sobre un tema de salud' : 'Ask about a health topic'}
+      </button>
+      <button class="guide-action-btn" onclick="startGuide('prep_appt')" style="text-align:left;padding:12px">
+        📋 ${isEs ? 'Prepararme para una cita médica' : 'Prepare for a doctor\'s appointment'}
+      </button>
+      <button class="guide-action-btn" onclick="startGuide('understand_data')" style="text-align:left;padding:12px">
+        📊 ${isEs ? 'Entender los datos de mi comunidad' : 'Understand my community\'s health data'}
+      </button>
+      <button class="guide-action-btn" onclick="startGuide('custom')" style="text-align:left;padding:12px">
+        ✨ ${isEs ? 'Otra cosa...' : 'Something else...'}
+      </button>
+    </div>
+  `;
+  document.getElementById('guide-actions-bar').innerHTML = '';
+}
+
+const goalToTab = {
+  find_clinic: 'clinics',
+  ask_health: 'chat',
+  prep_appt: 'prep',
+  understand_data: 'data',
+};
+
+async function startGuide(goal) {
+  guideGoal = goal;
+
+  if (goal === 'custom') {
+    showCustomGoalInput();
+    return;
+  }
+
+  const targetTab = goalToTab[goal];
+  if (targetTab) showTab(targetTab);
+
+  await generateGuideSteps(goal);
+}
+
+function showCustomGoalInput() {
+  const isEs = currentLang === 'es';
+  const body = document.getElementById('guide-body');
+  body.innerHTML = `
+    <div style="font-size:13px;color:var(--text2);margin-bottom:10px">${isEs ? 'Describe lo que necesitas:' : 'Describe what you need:'}</div>
+    <textarea id="custom-goal-input" class="chat-input" rows="3" placeholder="${isEs ? 'Ej: Necesito encontrar un doctor que hable español para revisar mi diabetes...' : 'E.g.: I need to find a Spanish-speaking doctor to check my diabetes...'}" style="width:100%;margin-bottom:10px"></textarea>
+  `;
+  document.getElementById('guide-actions-bar').innerHTML = `
+    <button class="guide-action-btn" onclick="showGuideGoalPicker()">← ${isEs ? 'Volver' : 'Back'}</button>
+    <button class="guide-action-btn primary" onclick="submitCustomGoal()">→ ${isEs ? 'Guíame' : 'Guide Me'}</button>
+  `;
+}
+
+async function submitCustomGoal() {
+  const input = document.getElementById('custom-goal-input');
+  const text = input?.value?.trim();
+  if (!text) return;
+  guideGoal = 'custom';
+  await generateGuideSteps('custom', text);
+}
+
+async function generateGuideSteps(goal, customText) {
+  const body = document.getElementById('guide-body');
+  const isEs = currentLang === 'es';
+  const uiState = getUIState();
+
+  body.innerHTML = `
+    <div class="guide-loading">
+      <span class="loading-spinner"></span>
+      ${isEs ? 'Analizando tu pantalla...' : 'Reading your screen...'}
+    </div>
+  `;
+  document.getElementById('guide-actions-bar').innerHTML = '';
+
+  const goalDescriptions = {
+    find_clinic: 'find an affordable clinic near them',
+    ask_health: 'ask a health question using the AI chat',
+    prep_appt: 'prepare for a medical appointment',
+    understand_data: 'understand the community health data dashboard',
+    custom: customText || 'get help with the app',
+  };
+
+  const guideSystemPrompt = `You are the Guide Me assistant for Salud Fácil, a bilingual health navigator app. You provide step-by-step guidance based on the user's current screen state.
+
+You are aware of the app's UI. The app has 4 tabs:
+- "Buscar Clínicas" / "Find Clinics": ZIP code search for nearby federally qualified health centers (FQHCs)
+- "Asistente IA" / "AI Assistant": bilingual chat for health questions
+- "Preparar Cita" / "Prep Appointment": checklist generator by health concern
+- "Datos" / "Data": community health statistics dashboard
+
+Current UI state: ${JSON.stringify(uiState)}
+
+The user's goal: ${goalDescriptions[goal]}
+
+Respond in ${isEs ? 'Spanish' : 'English'}. Give exactly 3-5 short, specific steps based on what the user sees RIGHT NOW. Each step should be one sentence. Reference specific UI elements they can see (buttons, fields, tabs).
+
+Also return a "highlight" field: the CSS selector of the FIRST element the user should interact with.
+
+Respond in this exact JSON format:
+{"steps":["step 1","step 2",...],"highlight":"#css-selector","tip":"one brief encouraging tip"}`;
+
+  try {
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 600,
+        system: guideSystemPrompt,
+        messages: [{ role: 'user', content: `Guide me now. My goal: ${goalDescriptions[goal]}` }]
+      })
+    });
+
+    const data = await response.json();
+    const raw = data.content?.[0]?.text || '';
+
+    let parsed;
+    try {
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
+    } catch {
+      parsed = { steps: [raw], highlight: '', tip: '' };
+    }
+
+    renderGuideSteps(parsed, goal);
+  } catch (err) {
+    body.innerHTML = `<div style="color:var(--red);font-size:13px">${isEs ? 'Error de conexión. Intenta de nuevo.' : 'Connection error. Try again.'}</div>`;
+    document.getElementById('guide-actions-bar').innerHTML = `
+      <button class="guide-action-btn" onclick="showGuideGoalPicker()">← ${isEs ? 'Volver' : 'Back'}</button>
+      <button class="guide-action-btn primary" onclick="generateGuideSteps('${goal}')">↻ ${isEs ? 'Reintentar' : 'Retry'}</button>
+    `;
+  }
+}
+
+function renderGuideSteps(data, goal) {
+  const body = document.getElementById('guide-body');
+  const isEs = currentLang === 'es';
+  const panelName = goalToTab[goal] || getUIState().activePanel;
+
+  clearHighlights();
+
+  const contextLabel = {
+    clinics: isEs ? '📍 Buscar Clínicas' : '📍 Find Clinics',
+    chat: isEs ? '💬 Asistente IA' : '💬 AI Assistant',
+    prep: isEs ? '📋 Preparar Cita' : '📋 Prep Appointment',
+    data: isEs ? '📊 Datos' : '📊 Data',
+  };
+
+  let html = `<div class="guide-context-badge">👁 ${contextLabel[panelName] || contextLabel.clinics}</div>`;
+
+  if (data.steps && data.steps.length) {
+    data.steps.forEach((step, i) => {
+      html += `
+        <div class="guide-step">
+          <div class="guide-step-num">${i + 1}</div>
+          <div class="guide-step-content">${step}</div>
+        </div>`;
+    });
+  }
+
+  if (data.tip) {
+    html += `<div style="background:rgba(245,166,35,0.08);border-radius:8px;padding:10px 12px;margin-top:4px;font-size:12px;color:var(--accent2)">💡 ${data.tip}</div>`;
+  }
+
+  body.innerHTML = html;
+
+  if (data.highlight) {
+    try {
+      const el = document.querySelector(data.highlight);
+      if (el) {
+        el.classList.add('guide-highlight');
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    } catch {}
+  }
+
+  document.getElementById('guide-actions-bar').innerHTML = `
+    <button class="guide-action-btn" onclick="showGuideGoalPicker()">← ${isEs ? 'Nuevo objetivo' : 'New goal'}</button>
+    <button class="guide-action-btn primary" onclick="refreshGuide('${goal}')">↻ ${isEs ? 'Actualizar' : 'Refresh'}</button>
+  `;
+}
+
+async function refreshGuide(goal) {
+  await generateGuideSteps(goal);
+}
+
+// Re-run guide when user switches tabs (if guide is active)
+const origShowTab = showTab;
+showTab = function(tab) {
+  origShowTab(tab);
+  if (guideActive && guideGoal) {
+    const newGoal = Object.entries(goalToTab).find(([k, v]) => v === tab)?.[0] || guideGoal;
+    guideGoal = newGoal;
+    generateGuideSteps(newGoal);
+  }
+};
 </script>
+
+<button class="guide-fab" id="guide-fab" onclick="toggleGuide()">
+  <span class="pulse-dot"></span>
+  <span class="t" data-es="Guíame" data-en="Guide Me">Guíame</span>
+</button>
+
+<div class="guide-overlay" id="guide-overlay">
+  <div class="guide-header">
+    <div class="guide-header-icon">🧭</div>
+    <div class="guide-header-text">
+      <div class="guide-header-title t" data-es="Guía Interactiva" data-en="Interactive Guide">Guía Interactiva</div>
+      <div class="guide-header-sub t" data-es="Te guío paso a paso" data-en="I'll walk you through it">Te guío paso a paso</div>
+    </div>
+  </div>
+  <div class="guide-body" id="guide-body"></div>
+  <div class="guide-actions" id="guide-actions-bar"></div>
+</div>
+
 </body>
 </html>
