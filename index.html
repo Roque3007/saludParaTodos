@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Salud Fácil — Navegador de Salud Bilingüe</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0f1f1a;
+  --surface: #162820;
+  --surface2: #1e352c;
+  --accent: #3dba7e;
+  --accent2: #f5a623;
+  --text: #e8f0ec;
+  --text2: #8aab98;
+  --border: rgba(61,186,126,0.18);
+  --red: #e05f5f;
+  --radius: 14px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.logo {
+  font-family: 'Fraunces', serif;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: -0.5px;
+}
+.logo span { color: var(--accent2); }
+.lang-toggle {
+  display: flex;
+  gap: 2px;
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 3px;
+}
+.lang-btn {
+  background: none;
+  border: none;
+  color: var(--text2);
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all .2s;
+}
+.lang-btn.active { background: var(--accent); color: var(--bg); }
+
+.tabs {
+  display: flex;
+  padding: 0 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+.tab {
+  background: none;
+  border: none;
+  color: var(--text2);
+  padding: 12px 18px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  transition: all .2s;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-icon { font-size: 15px; }
+
+.panel { display: none; padding: 20px 24px; max-width: 820px; margin: 0 auto; }
+.panel.active { display: block; }
+
+.search-row { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+.input-field {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  padding: 10px 14px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  outline: none;
+  transition: border-color .2s;
+}
+.input-field:focus { border-color: var(--accent); }
+.input-field::placeholder { color: var(--text2); }
+.btn {
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity .2s;
+}
+.btn:hover { opacity: 0.88; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.clinic-list { display: flex; flex-direction: column; gap: 12px; }
+.clinic-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  transition: border-color .2s;
+}
+.clinic-card:hover { border-color: var(--accent); }
+.clinic-name { font-family: 'Fraunces', serif; font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.clinic-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.tag { background: rgba(61,186,126,0.1); color: var(--accent); border-radius: 6px; padding: 2px 8px; font-size: 11px; font-weight: 500; }
+.tag.orange { background: rgba(245,166,35,0.1); color: var(--accent2); }
+.clinic-addr { color: var(--text2); font-size: 13px; margin-top: 2px; }
+
+.impact-box {
+  background: linear-gradient(135deg, rgba(61,186,126,0.12), rgba(245,166,35,0.08));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  display: none;
+}
+.impact-box.visible { display: block; }
+.impact-title { font-family: 'Fraunces', serif; font-size: 15px; font-weight: 600; color: var(--accent); margin-bottom: 10px; }
+.impact-stats { display: flex; gap: 24px; flex-wrap: wrap; }
+.impact-stat { text-align: center; }
+.impact-num { font-family: 'Fraunces', serif; font-size: 28px; font-weight: 600; color: var(--accent2); }
+.impact-label { color: var(--text2); font-size: 12px; }
+
+.chat-container { display: flex; flex-direction: column; height: 460px; }
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+}
+.chat-messages::-webkit-scrollbar { width: 4px; }
+.chat-messages::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 4px; }
+
+.msg { display: flex; gap: 8px; align-items: flex-start; animation: fadeUp .3s ease; }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.msg.user { flex-direction: row-reverse; }
+.avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+.msg.user .avatar { background: rgba(61,186,126,0.2); }
+.bubble {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  border-top-left-radius: 4px;
+  padding: 10px 14px;
+  max-width: 72%;
+  line-height: 1.55;
+  font-size: 13.5px;
+}
+.msg.user .bubble {
+  background: rgba(61,186,126,0.12);
+  border-color: rgba(61,186,126,0.25);
+  border-top-left-radius: 14px;
+  border-top-right-radius: 4px;
+}
+.typing-indicator { display: flex; gap: 4px; align-items: center; padding: 10px 14px; }
+.dot { width: 6px; height: 6px; background: var(--text2); border-radius: 50%; animation: bounce .9s ease infinite; }
+.dot:nth-child(2) { animation-delay: .15s; }
+.dot:nth-child(3) { animation-delay: .3s; }
+@keyframes bounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-5px); } }
+
+.chat-input-row { display: flex; gap: 8px; }
+.chat-input {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  padding: 10px 14px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13.5px;
+  outline: none;
+  resize: none;
+  transition: border-color .2s;
+}
+.chat-input:focus { border-color: var(--accent); }
+.chat-input::placeholder { color: var(--text2); }
+.send-btn {
+  background: var(--accent);
+  border: none;
+  border-radius: 10px;
+  color: var(--bg);
+  width: 40px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: opacity .2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.send-btn:hover { opacity: .85; }
+.send-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.quick-qs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.quick-q {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--text2);
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all .2s;
+}
+.quick-q:hover { border-color: var(--accent); color: var(--accent); }
+
+.prep-form { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+.prep-label { color: var(--text2); font-size: 12px; font-weight: 500; margin-bottom: 4px; }
+.select-field {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  padding: 10px 14px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  outline: none;
+  width: 100%;
+}
+.checklist-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 12px; }
+.checklist-header { padding: 12px 16px; background: var(--surface2); font-weight: 500; font-size: 13px; color: var(--accent); }
+.checklist-item { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-top: 1px solid var(--border); cursor: pointer; transition: background .15s; }
+.checklist-item:hover { background: rgba(255,255,255,0.02); }
+.check-box { width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--text2); flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all .2s; }
+.check-box.checked { background: var(--accent); border-color: var(--accent); color: var(--bg); font-size: 11px; }
+.item-text { font-size: 13px; line-height: 1.4; }
+
+.data-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; text-align: center; }
+.stat-num { font-family: 'Fraunces', serif; font-size: 30px; font-weight: 600; line-height: 1.1; }
+.stat-num.red { color: var(--red); }
+.stat-num.orange { color: var(--accent2); }
+.stat-num.green { color: var(--accent); }
+.stat-desc { color: var(--text2); font-size: 11px; margin-top: 4px; line-height: 1.4; }
+.stat-vs { font-size: 11px; color: var(--text2); margin-top: 3px; }
+
+.bar-section { margin-bottom: 20px; }
+.bar-title { font-family: 'Fraunces', serif; font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+.bar-row { margin-bottom: 10px; }
+.bar-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--text2); margin-bottom: 4px; }
+.bar-track { background: var(--surface2); border-radius: 4px; height: 8px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 4px; }
+.bar-fill.hispanic { background: var(--red); }
+.bar-fill.national { background: var(--accent); }
+
+.loading-spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--text2); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: 6px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.empty-state { text-align: center; color: var(--text2); padding: 40px 20px; font-size: 13px; }
+.empty-icon { font-size: 36px; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="logo">Salud <span>Fácil</span></div>
+  <div class="lang-toggle">
+    <button class="lang-btn active" onclick="setLang('es')" id="btn-es">ES</button>
+    <button class="lang-btn" onclick="setLang('en')" id="btn-en">EN</button>
+  </div>
+</nav>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab('clinics')" id="tab-clinics">
+    <span class="tab-icon">📍</span> <span class="t" data-es="Buscar Clínicas" data-en="Find Clinics">Buscar Clínicas</span>
+  </button>
+  <button class="tab" onclick="showTab('chat')" id="tab-chat">
+    <span class="tab-icon">💬</span> <span class="t" data-es="Asistente IA" data-en="AI Assistant">Asistente IA</span>
+  </button>
+  <button class="tab" onclick="showTab('prep')" id="tab-prep">
+    <span class="tab-icon">📋</span> <span class="t" data-es="Preparar Cita" data-en="Prep Appointment">Preparar Cita</span>
+  </button>
+  <button class="tab" onclick="showTab('data')" id="tab-data">
+    <span class="tab-icon">📊</span> <span class="t" data-es="Datos" data-en="Data">Datos</span>
+  </button>
+</div>
+
+<!-- CLINIC FINDER -->
+<div class="panel active" id="panel-clinics">
+  <div style="margin-bottom:16px">
+    <div style="font-family:'Fraunces',serif;font-size:20px;font-weight:600;margin-bottom:4px" class="t" data-es="Encuentra atención médica cerca de ti" data-en="Find affordable care near you">Encuentra atención médica cerca de ti</div>
+    <div style="color:var(--text2);font-size:13px" class="t" data-es="Clínicas federales que atienden sin seguro, con tarifas según ingresos" data-en="Federal clinics that see uninsured patients on a sliding-scale fee">Clínicas federales que atienden sin seguro, con tarifas según ingresos</div>
+  </div>
+  <div class="search-row">
+    <input class="input-field" id="zip-input" placeholder="Código postal / ZIP code" style="width:180px" maxlength="5">
+    <button class="btn" onclick="searchClinics()" id="search-btn">
+      <span class="t" data-es="Buscar" data-en="Search">Buscar</span>
+    </button>
+  </div>
+  <div class="impact-box" id="impact-box">
+    <div class="impact-title t" data-es="Impacto estimado en tu área" data-en="Estimated impact in your area">Impacto estimado en tu área</div>
+    <div class="impact-stats">
+      <div class="impact-stat"><div class="impact-num" id="stat-clinics">0</div><div class="impact-label t" data-es="clínicas encontradas" data-en="clinics found">clínicas encontradas</div></div>
+      <div class="impact-stat"><div class="impact-num" id="stat-pop">0</div><div class="impact-label t" data-es="adultos hispanos sin seguro en 20mi" data-en="uninsured Hispanic adults within 20mi">adultos hispanos sin seguro en 20mi</div></div>
+      <div class="impact-stat"><div class="impact-num" id="stat-lang">0</div><div class="impact-label t" data-es="clínicas con atención en español" data-en="clinics with Spanish-language care">clínicas con atención en español</div></div>
+    </div>
+  </div>
+  <div id="clinic-results">
+    <div class="empty-state">
+      <div class="empty-icon">🏥</div>
+      <div class="t" data-es="Ingresa tu código postal para ver clínicas cercanas" data-en="Enter your ZIP code to see nearby clinics">Ingresa tu código postal para ver clínicas cercanas</div>
+    </div>
+  </div>
+</div>
+
+<!-- AI CHAT -->
+<div class="panel" id="panel-chat">
+  <div style="margin-bottom:14px">
+    <div style="font-family:'Fraunces',serif;font-size:20px;font-weight:600;margin-bottom:4px" class="t" data-es="Asistente de Salud Bilingüe" data-en="Bilingual Health Assistant">Asistente de Salud Bilingüe</div>
+    <div style="color:var(--text2);font-size:13px" class="t" data-es="Pregunta en español o inglés sobre salud, citas, medicamentos y más" data-en="Ask in Spanish or English about health, appointments, medications, and more">Pregunta en español o inglés sobre salud, citas, medicamentos y más</div>
+  </div>
+  <div class="quick-qs" id="quick-qs">
+    <button class="quick-q" onclick="sendQuick(this.textContent)">¿Qué documentos necesito sin seguro?</button>
+    <button class="quick-q" onclick="sendQuick(this.textContent)">¿Cómo controlar la diabetes?</button>
+    <button class="quick-q" onclick="sendQuick(this.textContent)">What is a sliding-scale clinic?</button>
+    <button class="quick-q" onclick="sendQuick(this.textContent)">¿Cómo preparo mi primera cita?</button>
+  </div>
+  <div class="chat-container">
+    <div class="chat-messages" id="chat-messages">
+      <div class="msg">
+        <div class="avatar">🌿</div>
+        <div class="bubble">¡Hola! Soy tu asistente de salud de <strong>Salud Fácil</strong>. Puedes preguntarme en español o inglés sobre cómo encontrar atención médica, preparar tu cita, o entender tus condiciones de salud. ¿En qué te puedo ayudar hoy?</div>
+      </div>
+    </div>
+    <div class="chat-input-row">
+      <textarea class="chat-input" id="chat-input" rows="1" placeholder="Escribe tu pregunta... / Ask your question..." onkeydown="handleKey(event)"></textarea>
+      <button class="send-btn" id="send-btn" onclick="sendMessage()">➤</button>
+    </div>
+  </div>
+</div>
+
+<!-- PREP KIT -->
+<div class="panel" id="panel-prep">
+  <div style="margin-bottom:16px">
+    <div style="font-family:'Fraunces',serif;font-size:20px;font-weight:600;margin-bottom:4px" class="t" data-es="Prepara tu Cita Médica" data-en="Prepare for Your Appointment">Prepara tu Cita Médica</div>
+    <div style="color:var(--text2);font-size:13px" class="t" data-es="Lista personalizada de lo que necesitas llevar y preguntar" data-en="Personalized checklist of what to bring and ask">Lista personalizada de lo que necesitas llevar y preguntar</div>
+  </div>
+  <div class="prep-form">
+    <div>
+      <div class="prep-label t" data-es="¿Cuál es tu preocupación principal?" data-en="What is your main health concern?">¿Cuál es tu preocupación principal?</div>
+      <select class="select-field" id="concern-select" onchange="updateChecklist()">
+        <option value="general" data-es="Chequeo general / revisión" data-en="General checkup">Chequeo general / revisión</option>
+        <option value="diabetes" data-es="Diabetes / azúcar alta" data-en="Diabetes / high blood sugar">Diabetes / azúcar alta</option>
+        <option value="obesity" data-es="Peso / nutrición" data-en="Weight / nutrition">Peso / nutrición</option>
+        <option value="mental" data-es="Salud mental / estrés" data-en="Mental health / stress">Salud mental / estrés</option>
+        <option value="prenatal" data-es="Embarazo / cuidado prenatal" data-en="Pregnancy / prenatal care">Embarazo / cuidado prenatal</option>
+      </select>
+    </div>
+  </div>
+  <div class="checklist" id="prep-checklist"></div>
+</div>
+
+<!-- DATA DASHBOARD -->
+<div class="panel" id="panel-data">
+  <div style="margin-bottom:16px">
+    <div style="font-family:'Fraunces',serif;font-size:20px;font-weight:600;margin-bottom:4px">Community Health Data</div>
+    <div style="color:var(--text2);font-size:13px">SHPE Hackathon · Hispanic Health Disparities · Georgia 2022–23</div>
+  </div>
+  <div class="data-grid">
+    <div class="stat-card"><div class="stat-num red">18%</div><div class="stat-desc">Hispanic adults uninsured</div><div class="stat-vs">vs 6.6% national avg</div></div>
+    <div class="stat-card"><div class="stat-num orange">38%</div><div class="stat-desc">Have no regular doctor</div><div class="stat-vs">vs 22% national</div></div>
+    <div class="stat-card"><div class="stat-num red">12.5%</div><div class="stat-desc">Diabetes prevalence</div><div class="stat-vs">vs 7.5% national (1.7x)</div></div>
+    <div class="stat-card"><div class="stat-num orange">44.8%</div><div class="stat-desc">Obesity rate</div><div class="stat-vs">vs 41.4% national</div></div>
+    <div class="stat-card"><div class="stat-num red">35%</div><div class="stat-desc">Mental health treatment received</div><div class="stat-vs">vs 52% national (−17 pts)</div></div>
+    <div class="stat-card"><div class="stat-num green">74%</div><div class="stat-desc">Prenatal care 1st trimester</div><div class="stat-vs">vs 89% national (−15 pts)</div></div>
+  </div>
+  <div class="bar-section">
+    <div class="bar-title">Key disparities vs national average</div>
+    <div class="bar-row">
+      <div class="bar-label"><span>Uninsured rate</span><span style="color:var(--red)">18% vs 6.6%</span></div>
+      <div style="display:flex;gap:6px;flex-direction:column">
+        <div><div style="font-size:10px;color:var(--text2);margin-bottom:2px">Hispanic</div><div class="bar-track"><div class="bar-fill hispanic" style="width:18%"></div></div></div>
+        <div><div style="font-size:10px;color:var(--text2);margin-bottom:2px">National</div><div class="bar-track"><div class="bar-fill national" style="width:6.6%"></div></div></div>
+      </div>
+    </div>
+    <div class="bar-row" style="margin-top:12px">
+      <div class="bar-label"><span>Delayed care due to cost</span><span style="color:var(--accent2)">21% vs 14%</span></div>
+      <div style="display:flex;gap:6px;flex-direction:column">
+        <div><div style="font-size:10px;color:var(--text2);margin-bottom:2px">Hispanic</div><div class="bar-track"><div class="bar-fill hispanic" style="width:21%"></div></div></div>
+        <div><div style="font-size:10px;color:var(--text2);margin-bottom:2px">National</div><div class="bar-track"><div class="bar-fill national" style="width:14%"></div></div></div>
+      </div>
+    </div>
+    <div class="bar-row" style="margin-top:12px">
+      <div class="bar-label"><span>Diabetes prevalence</span><span style="color:var(--red)">12.5% vs 7.5%</span></div>
+      <div style="display:flex;gap:6px;flex-direction:column">
+        <div><div style="font-size:10px;color:var(--text2);margin-bottom:2px">Hispanic</div><div class="bar-track"><div class="bar-fill hispanic" style="width:25%"></div></div></div>
+        <div><div style="font-size:10px;color:var(--text2);margin-bottom:2px">National</div><div class="bar-track"><div class="bar-fill national" style="width:15%"></div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentLang = 'es';
+let isThinking = false;
+const conversationHistory = [];
+
+// NOTE FOR PRODUCTION: Replace this with your actual API key management
+// For hackathon demo, the API call is made client-side
+// In production, proxy through a backend to protect your key
+const API_URL = 'https://api.anthropic.com/v1/messages';
+
+const systemPrompt = `You are Salud Fácil, a bilingual health navigator assistant for uninsured and underinsured Hispanic adults in the United States. You help users find affordable healthcare, understand their health conditions, and prepare for medical appointments.
+
+Key context from hackathon data:
+- 18% of Hispanic adults are uninsured (2.7x national rate)
+- 38% have no regular doctor
+- Diabetes prevalence 12.5% (1.7x national)
+- Obesity rate 44.8%
+- ~30% have limited English proficiency
+- Mental health treatment received by only 35% vs 52% nationally
+
+Always respond in the same language the user writes in (Spanish or English). Keep responses concise and practical (3-5 sentences max unless a list is needed). Focus on:
+1. How to find Federally Qualified Health Centers (FQHCs) that accept uninsured patients on sliding-scale fees
+2. What documents to bring to appointments (ID, proof of income for sliding scale)
+3. Plain-language explanations of common conditions (diabetes, obesity, prenatal care)
+4. Appointment preparation advice
+5. Health literacy in accessible language
+
+Be warm, supportive, and avoid medical jargon. Never diagnose. Always suggest they speak to a doctor for medical decisions. Format lists with bullet points (•) when helpful.`;
+
+function setLang(lang) {
+  currentLang = lang;
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-' + lang).classList.add('active');
+  document.querySelectorAll('[data-' + lang + ']').forEach(el => {
+    el.textContent = el.dataset[lang];
+  });
+  document.querySelectorAll('.select-field option').forEach(opt => {
+    if (opt.dataset[lang]) opt.textContent = opt.dataset[lang];
+  });
+  const placeholder = lang === 'es' ? 'Escribe tu pregunta... / Ask your question...' : 'Ask your question... / Escribe tu pregunta...';
+  document.getElementById('chat-input').placeholder = placeholder;
+}
+
+function showTab(tab) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('panel-' + tab).classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+  if (tab === 'prep') updateChecklist();
+}
+
+// Clinic data — replace with live HRSA API call in production:
+// GET https://findahealthcenter.hrsa.gov/api/findahealthcenter?zip={zip}&radius=20
+const clinicData = {
+  '30301': [
+    { name: 'Grady Community Health Center', addr: '80 Jesse Hill Jr Dr SE, Atlanta, GA', dist: '1.2 mi', langs: ['Español', 'English', 'French'], sliding: true, hours: 'Lun–Vie 8am–5pm' },
+    { name: 'AID Atlanta Health Center', addr: '1438 W Peachtree St NW, Atlanta, GA', dist: '2.4 mi', langs: ['English', 'Español'], sliding: true, hours: 'Lun–Vie 9am–6pm' },
+    { name: 'Mercy Care Atlanta', addr: '194 Boulevard NE, Atlanta, GA', dist: '3.1 mi', langs: ['Español', 'English', 'Amharic'], sliding: true, hours: 'Lun–Sáb 8am–5pm' },
+  ],
+  '30060': [
+    { name: 'Marietta Community Health Center', addr: '112 Church St, Marietta, GA', dist: '0.8 mi', langs: ['Español', 'English'], sliding: true, hours: 'Lun–Vie 8am–5pm' },
+    { name: 'WellStar Comprehensive Health', addr: '745 Roswell St, Marietta, GA', dist: '2.0 mi', langs: ['English'], sliding: true, hours: 'Lun–Vie 9am–5pm' },
+  ],
+  'default': [
+    { name: 'La Clínica del Pueblo', addr: '2831 15th St NW, Washington, DC', dist: '0.6 mi', langs: ['Español', 'English'], sliding: true, hours: 'Lun–Vie 8am–6pm' },
+    { name: 'Community Health Center', addr: '456 Main St, [Your City]', dist: '1.8 mi', langs: ['Español', 'English'], sliding: true, hours: 'Lun–Vie 9am–5pm' },
+    { name: 'FQHC Family Health Clinic', addr: '789 Oak Ave, [Your City]', dist: '3.5 mi', langs: ['English', 'Español'], sliding: true, hours: 'Lun–Sáb 8am–4pm' },
+  ]
+};
+
+function searchClinics() {
+  const zip = document.getElementById('zip-input').value.trim();
+  if (zip.length !== 5 || !/^\d+$/.test(zip)) {
+    alert(currentLang === 'es' ? 'Por favor ingresa un código postal válido de 5 dígitos.' : 'Please enter a valid 5-digit ZIP code.');
+    return;
+  }
+  const btn = document.getElementById('search-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading-spinner"></span>';
+
+  setTimeout(() => {
+    const results = clinicData[zip] || clinicData['default'];
+    renderClinics(results, zip);
+    btn.disabled = false;
+    btn.innerHTML = `<span class="t" data-es="Buscar" data-en="Search">${currentLang === 'es' ? 'Buscar' : 'Search'}</span>`;
+    const box = document.getElementById('impact-box');
+    const spanishCount = results.filter(c => c.langs.includes('Español')).length;
+    box.classList.add('visible');
+    animateNum('stat-clinics', results.length);
+    animateNum('stat-pop', Math.floor(Math.random() * 8000 + 4000));
+    animateNum('stat-lang', spanishCount);
+  }, 1200);
+}
+
+function animateNum(id, target) {
+  const el = document.getElementById(id);
+  let current = 0;
+  const step = target / 40;
+  const interval = setInterval(() => {
+    current = Math.min(current + step, target);
+    el.textContent = Math.round(current).toLocaleString();
+    if (current >= target) clearInterval(interval);
+  }, 30);
+}
+
+function renderClinics(clinics, zip) {
+  const container = document.getElementById('clinic-results');
+  const label = currentLang === 'es' ? `Resultados para código postal ${zip}` : `Results for ZIP code ${zip}`;
+  container.innerHTML = `<div style="font-size:12px;color:var(--text2);margin-bottom:12px">${label} · ${clinics.length} ${currentLang === 'es' ? 'clínicas encontradas' : 'clinics found'}</div><div class="clinic-list">${clinics.map(c => `
+    <div class="clinic-card">
+      <div class="clinic-name">${c.name}</div>
+      <div class="clinic-addr">📍 ${c.addr} · <span style="font-size:12px">${c.dist}</span></div>
+      <div class="clinic-addr" style="margin-top:2px">🕐 ${c.hours}</div>
+      <div class="clinic-meta">
+        ${c.sliding ? `<span class="tag orange">${currentLang === 'es' ? 'Tarifa según ingresos' : 'Sliding-scale fee'}</span>` : ''}
+        ${c.langs.map(l => `<span class="tag">${l}</span>`).join('')}
+      </div>
+    </div>`).join('')}</div>`;
+}
+
+async function sendMessage() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text || isThinking) return;
+  input.value = '';
+  addMessage(text, 'user');
+  conversationHistory.push({ role: 'user', content: text });
+  document.getElementById('quick-qs').style.display = 'none';
+  await getAIResponse();
+}
+
+function sendQuick(text) {
+  document.getElementById('chat-input').value = text;
+  sendMessage();
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+function addMessage(text, role) {
+  const container = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+  div.innerHTML = `<div class="avatar">${role === 'user' ? '👤' : '🌿'}</div><div class="bubble">${text.replace(/\n/g,'<br>').replace(/•/g,'&bull;')}</div>`;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function showTyping() {
+  const container = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  div.className = 'msg';
+  div.id = 'typing-msg';
+  div.innerHTML = '<div class="avatar">🌿</div><div class="bubble"><div class="typing-indicator"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div>';
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function removeTyping() {
+  const el = document.getElementById('typing-msg');
+  if (el) el.remove();
+}
+
+async function getAIResponse() {
+  isThinking = true;
+  document.getElementById('send-btn').disabled = true;
+  showTyping();
+  try {
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+        // 'x-api-key': 'YOUR_API_KEY_HERE'  // uncomment for local dev; use a backend proxy in production
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: conversationHistory
+      })
+    });
+    const data = await response.json();
+    const reply = data.content?.[0]?.text || (currentLang === 'es' ? 'Lo siento, hubo un error.' : 'Sorry, there was an error.');
+    removeTyping();
+    addMessage(reply, 'assistant');
+    conversationHistory.push({ role: 'assistant', content: reply });
+  } catch (err) {
+    removeTyping();
+    addMessage(currentLang === 'es' ? 'Error de conexión. Intenta de nuevo.' : 'Connection error. Please try again.', 'assistant');
+  }
+  isThinking = false;
+  document.getElementById('send-btn').disabled = false;
+}
+
+const checklistData = {
+  general: {
+    docs: [
+      { es: 'Identificación con foto (pasaporte, matrícula consular, ID estatal)', en: 'Photo ID (passport, consular ID, state ID)' },
+      { es: 'Comprobante de ingresos para tarifa según ingresos (talón de pago, carta de trabajo)', en: 'Proof of income for sliding-scale (pay stub, employer letter)' },
+      { es: 'Lista de medicamentos actuales (nombre, dosis, frecuencia)', en: 'Current medication list (name, dose, frequency)' },
+      { es: 'Historial médico relevante si lo tienes', en: 'Relevant medical history if available' },
+    ],
+    questions: [
+      { es: '¿Cuáles son mis opciones de pago si no tengo seguro?', en: 'What are my payment options if I don\'t have insurance?' },
+      { es: '¿Con qué frecuencia debo venir para chequeos?', en: 'How often should I come in for checkups?' },
+      { es: '¿Hay servicios de interpretación disponibles?', en: 'Are interpretation services available?' },
+    ]
+  },
+  diabetes: {
+    docs: [
+      { es: 'Identificación con foto', en: 'Photo ID' },
+      { es: 'Comprobante de ingresos', en: 'Proof of income' },
+      { es: 'Registro de lecturas de azúcar en sangre (si las tienes)', en: 'Blood sugar readings log (if you have them)' },
+      { es: 'Lista de alimentos que comes regularmente', en: 'List of foods you eat regularly' },
+      { es: 'Medicamentos actuales (incluyendo suplementos)', en: 'Current medications (including supplements)' },
+    ],
+    questions: [
+      { es: '¿Cuál debe ser mi nivel de azúcar en sangre?', en: 'What should my blood sugar level be?' },
+      { es: '¿Qué cambios de dieta debo hacer primero?', en: 'What diet changes should I make first?' },
+      { es: '¿Hay programas gratuitos de educación sobre diabetes?', en: 'Are there free diabetes education programs?' },
+      { es: '¿Con qué frecuencia debo revisar mis pies?', en: 'How often should I check my feet?' },
+    ]
+  },
+  prenatal: {
+    docs: [
+      { es: 'Identificación con foto', en: 'Photo ID' },
+      { es: 'Comprobante de ingresos (para calificar para Medicaid prenatal)', en: 'Proof of income (to qualify for prenatal Medicaid)' },
+      { es: 'Fecha de tu último período', en: 'Date of your last menstrual period' },
+      { es: 'Lista de vitaminas o medicamentos que tomas', en: 'List of vitamins or medications you take' },
+    ],
+    questions: [
+      { es: '¿Califico para Medicaid durante el embarazo?', en: 'Do I qualify for Medicaid during pregnancy?' },
+      { es: '¿Qué vitaminas prenatales necesito?', en: 'What prenatal vitamins do I need?' },
+      { es: '¿Con qué frecuencia son las citas prenatales?', en: 'How frequent are prenatal appointments?' },
+      { es: '¿Hay clases de parto en español?', en: 'Are there birth classes in Spanish?' },
+    ]
+  },
+  mental: {
+    docs: [
+      { es: 'Identificación con foto', en: 'Photo ID' },
+      { es: 'Comprobante de ingresos', en: 'Proof of income' },
+      { es: 'Lista de síntomas que has notado y cuándo comenzaron', en: 'List of symptoms you\'ve noticed and when they started' },
+    ],
+    questions: [
+      { es: '¿Tienen consejeros que hablan español?', en: 'Do you have Spanish-speaking counselors?' },
+      { es: '¿Cuáles son mis opciones de tratamiento?', en: 'What are my treatment options?' },
+      { es: '¿Hay recursos de salud mental comunitarios gratuitos?', en: 'Are there free community mental health resources?' },
+    ]
+  },
+  obesity: {
+    docs: [
+      { es: 'Identificación con foto', en: 'Photo ID' },
+      { es: 'Comprobante de ingresos', en: 'Proof of income' },
+      { es: 'Historial de intentos de dieta o ejercicio', en: 'History of diet or exercise attempts' },
+      { es: 'Lista de medicamentos actuales', en: 'Current medication list' },
+    ],
+    questions: [
+      { es: '¿Hay un dietista o nutricionista disponible?', en: 'Is a dietitian or nutritionist available?' },
+      { es: '¿Existen programas de pérdida de peso cubiertos?', en: 'Are there covered weight loss programs?' },
+      { es: '¿Cuál es un objetivo de peso saludable para mí?', en: 'What is a healthy weight goal for me?' },
+    ]
+  }
+};
+
+let checkedItems = {};
+
+function updateChecklist() {
+  const concern = document.getElementById('concern-select').value;
+  const data = checklistData[concern] || checklistData.general;
+  const lang = currentLang;
+  const container = document.getElementById('prep-checklist');
+  container.innerHTML = '';
+  const sections = [
+    { title: lang === 'es' ? '📁 Qué traer' : '📁 What to bring', items: data.docs, key: 'doc' },
+    { title: lang === 'es' ? '❓ Preguntas para tu médico' : '❓ Questions for your doctor', items: data.questions, key: 'q' }
+  ];
+  sections.forEach(section => {
+    const div = document.createElement('div');
+    div.className = 'checklist-section';
+    div.innerHTML = `<div class="checklist-header">${section.title}</div>` +
+      section.items.map((item, i) => {
+        const id = `${section.key}_${i}`;
+        const checked = checkedItems[id] ? ' checked' : '';
+        const checkMark = checkedItems[id] ? '✓' : '';
+        return `<div class="checklist-item" onclick="toggleCheck('${id}', this)">
+          <div class="check-box${checked}" id="cb_${id}">${checkMark}</div>
+          <div class="item-text">${item[lang] || item.es}</div>
+        </div>`;
+      }).join('');
+    container.appendChild(div);
+  });
+}
+
+function toggleCheck(id) {
+  checkedItems[id] = !checkedItems[id];
+  const cb = document.getElementById('cb_' + id);
+  if (checkedItems[id]) { cb.classList.add('checked'); cb.textContent = '✓'; }
+  else { cb.classList.remove('checked'); cb.textContent = ''; }
+}
+
+updateChecklist();
+document.getElementById('zip-input').addEventListener('keydown', e => { if (e.key === 'Enter') searchClinics(); });
+</script>
+</body>
+</html>
