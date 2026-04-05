@@ -6,8 +6,21 @@
 <title>Salud Fácil — Navegador de Salud Bilingüe</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+.map-container {
+  width: 100%;
+  height: 320px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+.map-container iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
 :root {
   --bg: #0f1f1a;
   --surface: #162820;
@@ -142,6 +155,19 @@ body {
 .tag { background: rgba(61,186,126,0.1); color: var(--accent); border-radius: 6px; padding: 2px 8px; font-size: 11px; font-weight: 500; }
 .tag.orange { background: rgba(245,166,35,0.1); color: var(--accent2); }
 .clinic-addr { color: var(--text2); font-size: 13px; margin-top: 2px; }
+.clinic-addr { color: var(--text2); font-size: 13px; margin-top: 2px; }
+
+.clinic-pin-label {
+  background: #0f1f1a;
+  color: #3dba7e;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(61,186,126,0.4);
+  white-space: nowrap;
+}
 
 .impact-box {
   background: linear-gradient(135deg, rgba(61,186,126,0.12), rgba(245,166,35,0.08));
@@ -230,6 +256,30 @@ body {
 .send-btn:hover { opacity: .85; }
 .send-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
+.voice-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  width: 40px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all .2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.voice-btn:hover { border-color: var(--accent); }
+.voice-btn.listening {
+  background: rgba(224,95,95,0.15);
+  border-color: var(--red);
+  animation: voicePulse 1s ease infinite;
+}
+@keyframes voicePulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(224,95,95,0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(224,95,95,0); }
+}
+
 .quick-qs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 .quick-q {
   background: var(--surface2);
@@ -288,7 +338,6 @@ body {
 .empty-state { text-align: center; color: var(--text2); padding: 40px 20px; font-size: 13px; }
 .empty-icon { font-size: 36px; margin-bottom: 10px; }
 
-/* Guide Me */
 .guide-fab {
   position: fixed;
   bottom: 24px;
@@ -377,7 +426,6 @@ body {
   flex-shrink: 0;
   margin-top: 1px;
 }
-.guide-step-num.done { background: var(--text2); }
 .guide-step-content { font-size: 13px; line-height: 1.5; color: var(--text); }
 .guide-step-content strong { color: var(--accent); }
 
@@ -478,6 +526,8 @@ body {
       <div class="impact-stat"><div class="impact-num" id="stat-lang">0</div><div class="impact-label t" data-es="clínicas con atención en español" data-en="clinics with Spanish-language care">clínicas con atención en español</div></div>
     </div>
   </div>
+  <div id="map-container" style="width:100%;height:320px;border-radius:14px;overflow:hidden;border:1px solid rgba(61,186,126,0.18);margin-bottom:20px;"></div>
+
   <div id="clinic-results">
     <div class="empty-state">
       <div class="empty-icon">🏥</div>
@@ -507,6 +557,7 @@ body {
     </div>
     <div class="chat-input-row">
       <textarea class="chat-input" id="chat-input" rows="1" placeholder="Escribe tu pregunta... / Ask your question..." onkeydown="handleKey(event)"></textarea>
+      <button class="voice-btn" id="voice-btn" onclick="toggleVoice()" title="Hablar / Speak">🎤</button>
       <button class="send-btn" id="send-btn" onclick="sendMessage()">➤</button>
     </div>
   </div>
@@ -573,15 +624,32 @@ body {
   </div>
 </div>
 
+<script src="clinic-data.js"></script>
+
 <script>
 let currentLang = 'es';
 let isThinking = false;
 const conversationHistory = [];
 
-// NOTE FOR PRODUCTION: Replace this with your actual API key management
-// For hackathon demo, the API call is made client-side
-// In production, proxy through a backend to protect your key
-const API_URL = 'https://api.anthropic.com/v1/messages';
+const API_PROXY = '/api/chat';
+
+async function callGemini(messages, system, maxTokens) {
+  const contents = messages.map(m => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }]
+  }));
+  const res = await fetch(API_PROXY, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: system }] },
+      contents,
+      generationConfig: { maxOutputTokens: maxTokens || 1000 }
+    })
+  });
+  const data = await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
 
 const systemPrompt = `You are Salud Fácil, a bilingual health navigator assistant for uninsured and underinsured Hispanic adults in the United States. You help users find affordable healthcare, understand their health conditions, and prepare for medical appointments.
 
@@ -624,25 +692,6 @@ function showTab(tab) {
   if (tab === 'prep') updateChecklist();
 }
 
-// Clinic data — replace with live HRSA API call in production:
-// GET https://findahealthcenter.hrsa.gov/api/findahealthcenter?zip={zip}&radius=20
-const clinicData = {
-  '30301': [
-    { name: 'Grady Community Health Center', addr: '80 Jesse Hill Jr Dr SE, Atlanta, GA', dist: '1.2 mi', langs: ['Español', 'English', 'French'], sliding: true, hours: 'Lun–Vie 8am–5pm' },
-    { name: 'AID Atlanta Health Center', addr: '1438 W Peachtree St NW, Atlanta, GA', dist: '2.4 mi', langs: ['English', 'Español'], sliding: true, hours: 'Lun–Vie 9am–6pm' },
-    { name: 'Mercy Care Atlanta', addr: '194 Boulevard NE, Atlanta, GA', dist: '3.1 mi', langs: ['Español', 'English', 'Amharic'], sliding: true, hours: 'Lun–Sáb 8am–5pm' },
-  ],
-  '30060': [
-    { name: 'Marietta Community Health Center', addr: '112 Church St, Marietta, GA', dist: '0.8 mi', langs: ['Español', 'English'], sliding: true, hours: 'Lun–Vie 8am–5pm' },
-    { name: 'WellStar Comprehensive Health', addr: '745 Roswell St, Marietta, GA', dist: '2.0 mi', langs: ['English'], sliding: true, hours: 'Lun–Vie 9am–5pm' },
-  ],
-  'default': [
-    { name: 'La Clínica del Pueblo', addr: '2831 15th St NW, Washington, DC', dist: '0.6 mi', langs: ['Español', 'English'], sliding: true, hours: 'Lun–Vie 8am–6pm' },
-    { name: 'Community Health Center', addr: '456 Main St, [Your City]', dist: '1.8 mi', langs: ['Español', 'English'], sliding: true, hours: 'Lun–Vie 9am–5pm' },
-    { name: 'FQHC Family Health Clinic', addr: '789 Oak Ave, [Your City]', dist: '3.5 mi', langs: ['English', 'Español'], sliding: true, hours: 'Lun–Sáb 8am–4pm' },
-  ]
-};
-
 function searchClinics() {
   const zip = document.getElementById('zip-input').value.trim();
   if (zip.length !== 5 || !/^\d+$/.test(zip)) {
@@ -658,9 +707,8 @@ function searchClinics() {
     renderClinics(results, zip);
     btn.disabled = false;
     btn.innerHTML = `<span class="t" data-es="Buscar" data-en="Search">${currentLang === 'es' ? 'Buscar' : 'Search'}</span>`;
-    const box = document.getElementById('impact-box');
     const spanishCount = results.filter(c => c.langs.includes('Español')).length;
-    box.classList.add('visible');
+    document.getElementById('impact-box').classList.add('visible');
     animateNum('stat-clinics', results.length);
     animateNum('stat-pop', Math.floor(Math.random() * 8000 + 4000));
     animateNum('stat-lang', spanishCount);
@@ -678,19 +726,110 @@ function animateNum(id, target) {
   }, 30);
 }
 
-function renderClinics(clinics, zip) {
+let googleMap = null;
+let mapsApiLoaded = false;
+
+async function loadGoogleMaps() {
+  if (mapsApiLoaded) return;
+  if (window.google && window.google.maps) { mapsApiLoaded = true; return; }
+  
+  const res = await fetch('/api/maps-key');
+  const { key } = await res.json();
+  
+  return new Promise((resolve, reject) => {
+    const callbackName = 'initGoogleMaps_' + Date.now();
+    window[callbackName] = () => {
+      mapsApiLoaded = true;
+      resolve();
+    };
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&callback=${callbackName}`;
+    script.onerror = reject;
+    document.body.appendChild(script);
+  });
+}
+
+async function renderClinics(clinics, zip) {
   const container = document.getElementById('clinic-results');
-  const label = currentLang === 'es' ? `Resultados para código postal ${zip}` : `Results for ZIP code ${zip}`;
-  container.innerHTML = `<div style="font-size:12px;color:var(--text2);margin-bottom:12px">${label} · ${clinics.length} ${currentLang === 'es' ? 'clínicas encontradas' : 'clinics found'}</div><div class="clinic-list">${clinics.map(c => `
-    <div class="clinic-card">
-      <div class="clinic-name">${c.name}</div>
-      <div class="clinic-addr">📍 ${c.addr} · <span style="font-size:12px">${c.dist}</span></div>
-      <div class="clinic-addr" style="margin-top:2px">🕐 ${c.hours}</div>
-      <div class="clinic-meta">
-        ${c.sliding ? `<span class="tag orange">${currentLang === 'es' ? 'Tarifa según ingresos' : 'Sliding-scale fee'}</span>` : ''}
-        ${c.langs.map(l => `<span class="tag">${l}</span>`).join('')}
-      </div>
-    </div>`).join('')}</div>`;
+  const label = currentLang === 'es'
+    ? `Resultados para código postal ${zip}`
+    : `Results for ZIP code ${zip}`;
+
+  const mapDiv = document.getElementById('map-container');
+  mapDiv.style.display = 'block';
+
+  container.innerHTML = `
+    <div style="font-size:12px;color:var(--text2);margin-bottom:12px">
+      ${label} · ${clinics.length} ${currentLang === 'es' ? 'clínicas encontradas' : 'clinics found'}
+    </div>
+    <div class="clinic-list">
+      ${clinics.map(c => `
+        <div class="clinic-card">
+          <div class="clinic-name">${c.name}</div>
+          <div class="clinic-addr">📍 ${c.addr} · <span style="font-size:12px">${c.dist}</span></div>
+          <div class="clinic-addr" style="margin-top:2px">🕐 ${c.hours}</div>
+          <div class="clinic-meta">
+            ${c.sliding ? `<span class="tag orange">${currentLang === 'es' ? 'Tarifa según ingresos' : 'Sliding-scale fee'}</span>` : ''}
+            ${c.langs.map(l => `<span class="tag">${l}</span>`).join('')}
+          </div>
+        </div>`).join('')}
+    </div>`;
+
+  await loadGoogleMaps();
+  await new Promise(r => setTimeout(r, 200));
+
+  googleMap = new google.maps.Map(mapDiv, {
+    zoom: 12,
+    center: { lat: 33.749, lng: -84.388 },
+    styles: [
+      { elementType: 'geometry', stylers: [{ color: '#0f1f1a' }] },
+      { elementType: 'labels.text.stroke', stylers: [{ color: '#0f1f1a' }] },
+      { elementType: 'labels.text.fill', stylers: [{ color: '#8aab98' }] },
+      { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#1e352c' }] },
+      { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#162820' }] },
+      { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0a1510' }] },
+      { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+      { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+    ]
+  });
+
+  google.maps.event.trigger(googleMap, 'resize');
+
+  const geocoder = new google.maps.Geocoder();
+  const bounds = new google.maps.LatLngBounds();
+
+  clinics.forEach((clinic, i) => {
+    geocoder.geocode({ address: clinic.addr }, (results, status) => {
+      if (status === 'OK') {
+        const pos = results[0].geometry.location;
+        bounds.extend(pos);
+
+        new google.maps.Marker({
+          position: pos,
+          map: googleMap,
+          title: clinic.name,
+          label: {
+            text: String(i + 1),
+            color: '#ffffff',
+            fontSize: '12px',
+            fontWeight: '600'
+          },
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 12,
+            fillColor: '#3dba7e',
+            fillOpacity: 1,
+            strokeColor: '#0f1f1a',
+            strokeWeight: 2
+          }
+        });
+
+        if (i === clinics.length - 1) {
+          googleMap.fitBounds(bounds);
+        }
+      }
+    });
+  });
 }
 
 async function sendMessage() {
@@ -742,23 +881,8 @@ async function getAIResponse() {
   document.getElementById('send-btn').disabled = true;
   showTyping();
   try {
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-        // 'x-api-key': 'YOUR_API_KEY_HERE'  // uncomment for local dev; use a backend proxy in production
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        system: systemPrompt,
-        messages: conversationHistory
-      })
-    });
-    const data = await response.json();
-    const reply = data.content?.[0]?.text || (currentLang === 'es' ? 'Lo siento, hubo un error.' : 'Sorry, there was an error.');
+    const reply = await callGemini(conversationHistory, systemPrompt, 1000) ||
+      (currentLang === 'es' ? 'Lo siento, hubo un error.' : 'Sorry, there was an error.');
     removeTyping();
     addMessage(reply, 'assistant');
     conversationHistory.push({ role: 'assistant', content: reply });
@@ -770,6 +894,61 @@ async function getAIResponse() {
   document.getElementById('send-btn').disabled = false;
 }
 
+// ── Voice Input ──
+let recognition = null;
+let isListening = false;
+
+function toggleVoice() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    alert(currentLang === 'es'
+      ? 'Tu navegador no soporta reconocimiento de voz. Usa Chrome.'
+      : 'Your browser does not support voice input. Please use Chrome.');
+    return;
+  }
+  if (isListening) { recognition.stop(); return; }
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SpeechRecognition();
+  recognition.lang = currentLang === 'es' ? 'es-US' : 'en-US';
+  recognition.continuous = false;
+  recognition.interimResults = true;
+
+  const btn = document.getElementById('voice-btn');
+  const input = document.getElementById('chat-input');
+
+  recognition.onstart = () => {
+    isListening = true;
+    btn.classList.add('listening');
+    btn.textContent = '⏹';
+    input.placeholder = currentLang === 'es' ? 'Escuchando...' : 'Listening...';
+  };
+
+  recognition.onresult = (e) => {
+    const transcript = Array.from(e.results).map(r => r[0].transcript).join('');
+    input.value = transcript;
+    if (e.results[0].isFinal) {
+      stopListening();
+      setTimeout(() => sendMessage(), 300);
+    }
+  };
+
+  recognition.onerror = (e) => { console.warn('Voice error:', e.error); stopListening(); };
+  recognition.onend = () => stopListening();
+  recognition.start();
+}
+
+function stopListening() {
+  isListening = false;
+  const btn = document.getElementById('voice-btn');
+  const input = document.getElementById('chat-input');
+  btn.classList.remove('listening');
+  btn.textContent = '🎤';
+  input.placeholder = currentLang === 'es'
+    ? 'Escribe tu pregunta... / Ask your question...'
+    : 'Ask your question... / Escribe tu pregunta...';
+}
+
+// ── Checklist ──
 const checklistData = {
   general: {
     docs: [
@@ -860,7 +1039,7 @@ function updateChecklist() {
         const id = `${section.key}_${i}`;
         const checked = checkedItems[id] ? ' checked' : '';
         const checkMark = checkedItems[id] ? '✓' : '';
-        return `<div class="checklist-item" onclick="toggleCheck('${id}', this)">
+        return `<div class="checklist-item" onclick="toggleCheck('${id}')">
           <div class="check-box${checked}" id="cb_${id}">${checkMark}</div>
           <div class="item-text">${item[lang] || item.es}</div>
         </div>`;
@@ -879,44 +1058,33 @@ function toggleCheck(id) {
 updateChecklist();
 document.getElementById('zip-input').addEventListener('keydown', e => { if (e.key === 'Enter') searchClinics(); });
 
-// ── Guide Me: Simulated Screen Awareness ──
-
+// ── Guide Me ──
 let guideActive = false;
 let guideGoal = null;
 
 function getUIState() {
-  const activeTab = document.querySelector('.tab.active .t')?.dataset[currentLang] ||
-                    document.querySelector('.tab.active .t')?.textContent || 'unknown';
   const activePanel = document.querySelector('.panel.active')?.id?.replace('panel-', '') || 'unknown';
-
-  const state = { activeTab, activePanel, lang: currentLang };
+  const state = { activePanel, lang: currentLang };
 
   if (activePanel === 'clinics') {
     const zip = document.getElementById('zip-input').value.trim();
     const hasResults = document.querySelector('.clinic-card') !== null;
     const clinicCount = document.querySelectorAll('.clinic-card').length;
-    const impactVisible = document.getElementById('impact-box').classList.contains('visible');
-    state.clinics = { zip, hasResults, clinicCount, impactVisible };
+    state.clinics = { zip, hasResults, clinicCount };
   }
-
   if (activePanel === 'chat') {
     const msgCount = document.querySelectorAll('.msg').length;
-    const lastMsg = document.querySelector('.msg:last-child .bubble')?.textContent?.slice(0, 100) || '';
-    const inputText = document.getElementById('chat-input').value.trim();
-    state.chat = { msgCount, lastMsg, inputText, isThinking };
+    state.chat = { msgCount, isThinking };
   }
-
   if (activePanel === 'prep') {
     const concern = document.getElementById('concern-select').value;
     const totalChecks = document.querySelectorAll('.checklist-item').length;
     const checkedCount = document.querySelectorAll('.check-box.checked').length;
     state.prep = { concern, totalChecks, checkedCount };
   }
-
   if (activePanel === 'data') {
     state.data = { viewing: true };
   }
-
   return state;
 }
 
@@ -927,12 +1095,12 @@ function toggleGuide() {
 
   if (guideActive) {
     fab.classList.add('active');
-    fab.innerHTML = `✕ <span class="t" data-es="Cerrar Guía" data-en="Close Guide">${currentLang === 'es' ? 'Cerrar Guía' : 'Close Guide'}</span>`;
+    fab.innerHTML = `✕ <span>${currentLang === 'es' ? 'Cerrar Guía' : 'Close Guide'}</span>`;
     overlay.classList.add('open');
     showGuideGoalPicker();
   } else {
     fab.classList.remove('active');
-    fab.innerHTML = `<span class="pulse-dot"></span> <span class="t" data-es="Guíame" data-en="Guide Me">${currentLang === 'es' ? 'Guíame' : 'Guide Me'}</span>`;
+    fab.innerHTML = `<span class="pulse-dot"></span> <span>${currentLang === 'es' ? 'Guíame' : 'Guide Me'}</span>`;
     overlay.classList.remove('open');
     guideGoal = null;
     clearHighlights();
@@ -949,23 +1117,12 @@ function showGuideGoalPicker() {
   body.innerHTML = `
     <div style="font-size:13px;color:var(--text2);margin-bottom:14px">${isEs ? '¿Qué quieres hacer hoy?' : 'What do you want to do today?'}</div>
     <div style="display:flex;flex-direction:column;gap:8px">
-      <button class="guide-action-btn" onclick="startGuide('find_clinic')" style="text-align:left;padding:12px">
-        📍 ${isEs ? 'Encontrar una clínica cerca de mí' : 'Find a clinic near me'}
-      </button>
-      <button class="guide-action-btn" onclick="startGuide('ask_health')" style="text-align:left;padding:12px">
-        💬 ${isEs ? 'Preguntar sobre un tema de salud' : 'Ask about a health topic'}
-      </button>
-      <button class="guide-action-btn" onclick="startGuide('prep_appt')" style="text-align:left;padding:12px">
-        📋 ${isEs ? 'Prepararme para una cita médica' : 'Prepare for a doctor\'s appointment'}
-      </button>
-      <button class="guide-action-btn" onclick="startGuide('understand_data')" style="text-align:left;padding:12px">
-        📊 ${isEs ? 'Entender los datos de mi comunidad' : 'Understand my community\'s health data'}
-      </button>
-      <button class="guide-action-btn" onclick="startGuide('custom')" style="text-align:left;padding:12px">
-        ✨ ${isEs ? 'Otra cosa...' : 'Something else...'}
-      </button>
-    </div>
-  `;
+      <button class="guide-action-btn" onclick="startGuide('find_clinic')" style="text-align:left;padding:12px">📍 ${isEs ? 'Encontrar una clínica cerca de mí' : 'Find a clinic near me'}</button>
+      <button class="guide-action-btn" onclick="startGuide('ask_health')" style="text-align:left;padding:12px">💬 ${isEs ? 'Preguntar sobre un tema de salud' : 'Ask about a health topic'}</button>
+      <button class="guide-action-btn" onclick="startGuide('prep_appt')" style="text-align:left;padding:12px">📋 ${isEs ? 'Prepararme para una cita médica' : 'Prepare for a doctor\'s appointment'}</button>
+      <button class="guide-action-btn" onclick="startGuide('understand_data')" style="text-align:left;padding:12px">📊 ${isEs ? 'Entender los datos de mi comunidad' : 'Understand my community\'s health data'}</button>
+      <button class="guide-action-btn" onclick="startGuide('custom')" style="text-align:left;padding:12px">✨ ${isEs ? 'Otra cosa...' : 'Something else...'}</button>
+    </div>`;
   document.getElementById('guide-actions-bar').innerHTML = '';
 }
 
@@ -978,34 +1135,24 @@ const goalToTab = {
 
 async function startGuide(goal) {
   guideGoal = goal;
-
-  if (goal === 'custom') {
-    showCustomGoalInput();
-    return;
-  }
-
+  if (goal === 'custom') { showCustomGoalInput(); return; }
   const targetTab = goalToTab[goal];
   if (targetTab) showTab(targetTab);
-
   await generateGuideSteps(goal);
 }
 
 function showCustomGoalInput() {
   const isEs = currentLang === 'es';
-  const body = document.getElementById('guide-body');
-  body.innerHTML = `
+  document.getElementById('guide-body').innerHTML = `
     <div style="font-size:13px;color:var(--text2);margin-bottom:10px">${isEs ? 'Describe lo que necesitas:' : 'Describe what you need:'}</div>
-    <textarea id="custom-goal-input" class="chat-input" rows="3" placeholder="${isEs ? 'Ej: Necesito encontrar un doctor que hable español para revisar mi diabetes...' : 'E.g.: I need to find a Spanish-speaking doctor to check my diabetes...'}" style="width:100%;margin-bottom:10px"></textarea>
-  `;
+    <textarea id="custom-goal-input" class="chat-input" rows="3" placeholder="${isEs ? 'Ej: Necesito encontrar un doctor...' : 'E.g.: I need to find a doctor...'}" style="width:100%;margin-bottom:10px"></textarea>`;
   document.getElementById('guide-actions-bar').innerHTML = `
     <button class="guide-action-btn" onclick="showGuideGoalPicker()">← ${isEs ? 'Volver' : 'Back'}</button>
-    <button class="guide-action-btn primary" onclick="submitCustomGoal()">→ ${isEs ? 'Guíame' : 'Guide Me'}</button>
-  `;
+    <button class="guide-action-btn primary" onclick="submitCustomGoal()">→ ${isEs ? 'Guíame' : 'Guide Me'}</button>`;
 }
 
 async function submitCustomGoal() {
-  const input = document.getElementById('custom-goal-input');
-  const text = input?.value?.trim();
+  const text = document.getElementById('custom-goal-input')?.value?.trim();
   if (!text) return;
   guideGoal = 'custom';
   await generateGuideSteps('custom', text);
@@ -1016,12 +1163,7 @@ async function generateGuideSteps(goal, customText) {
   const isEs = currentLang === 'es';
   const uiState = getUIState();
 
-  body.innerHTML = `
-    <div class="guide-loading">
-      <span class="loading-spinner"></span>
-      ${isEs ? 'Analizando tu pantalla...' : 'Reading your screen...'}
-    </div>
-  `;
+  body.innerHTML = `<div class="guide-loading"><span class="loading-spinner"></span>${isEs ? 'Analizando tu pantalla...' : 'Reading your screen...'}</div>`;
   document.getElementById('guide-actions-bar').innerHTML = '';
 
   const goalDescriptions = {
@@ -1032,59 +1174,46 @@ async function generateGuideSteps(goal, customText) {
     custom: customText || 'get help with the app',
   };
 
-  const guideSystemPrompt = `You are the Guide Me assistant for Salud Fácil, a bilingual health navigator app. You provide step-by-step guidance based on the user's current screen state.
+  const guideSystemPrompt = `You are the Guide Me assistant for Salud Fácil, a bilingual health navigator app for uninsured Hispanic adults.
 
-You are aware of the app's UI. The app has 4 tabs:
-- "Buscar Clínicas" / "Find Clinics": ZIP code search for nearby federally qualified health centers (FQHCs)
-- "Asistente IA" / "AI Assistant": bilingual chat for health questions
-- "Preparar Cita" / "Prep Appointment": checklist generator by health concern
-- "Datos" / "Data": community health statistics dashboard
+App tabs:
+- "Buscar Clínicas" / "Find Clinics": ZIP code search for nearby FQHCs
+- "Asistente IA" / "AI Assistant": bilingual health chat
+- "Preparar Cita" / "Prep Appointment": checklist by health concern
+- "Datos" / "Data": community health statistics
 
 Current UI state: ${JSON.stringify(uiState)}
+User's goal: ${goalDescriptions[goal]}
 
-The user's goal: ${goalDescriptions[goal]}
-
-Respond in ${isEs ? 'Spanish' : 'English'}. Give exactly 3-5 short, specific steps based on what the user sees RIGHT NOW. Each step should be one sentence. Reference specific UI elements they can see (buttons, fields, tabs).
-
-Also return a "highlight" field: the CSS selector of the FIRST element the user should interact with.
-
-Respond in this exact JSON format:
-{"steps":["step 1","step 2",...],"highlight":"#css-selector","tip":"one brief encouraging tip"}`;
+Respond in ${isEs ? 'Spanish' : 'English'}. Give exactly 3-5 short specific steps. Reference actual UI elements.
+Respond ONLY in this exact JSON format with no markdown fences:
+{"steps":["step 1","step 2","step 3"],"highlight":"#css-selector","tip":"one brief tip"}`;
 
   try {
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 600,
-        system: guideSystemPrompt,
-        messages: [{ role: 'user', content: `Guide me now. My goal: ${goalDescriptions[goal]}` }]
-      })
-    });
-
-    const data = await response.json();
-    const raw = data.content?.[0]?.text || '';
+    const raw = await callGemini(
+      [{ role: 'user', content: `Guide me. Goal: ${goalDescriptions[goal]}` }],
+      guideSystemPrompt,
+      600
+    );
 
     let parsed;
     try {
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      parsed = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
+      const clean = raw.replace(/```json|```/g, '').trim();
+      const jsonMatch = clean.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        parsed = JSON.parse(jsonMatch[0]);
+        console.log('✅ Gemini guide working:', parsed);
+        renderGuideSteps(parsed, goal);
+      } else {
+        throw new Error('no JSON found');
+      }
     } catch {
-      parsed = { steps: [raw], highlight: '', tip: '' };
+      console.warn('JSON parse failed, using fallback');
+      renderGuideSteps(getSmartSteps(goal, uiState, isEs), goal);
     }
-
-    renderGuideSteps(parsed, goal);
   } catch (err) {
-    body.innerHTML = `<div style="color:var(--red);font-size:13px">${isEs ? 'Error de conexión. Intenta de nuevo.' : 'Connection error. Try again.'}</div>`;
-    document.getElementById('guide-actions-bar').innerHTML = `
-      <button class="guide-action-btn" onclick="showGuideGoalPicker()">← ${isEs ? 'Volver' : 'Back'}</button>
-      <button class="guide-action-btn primary" onclick="generateGuideSteps('${goal}')">↻ ${isEs ? 'Reintentar' : 'Retry'}</button>
-    `;
+    console.warn('Gemini failed, using smart fallback:', err.message);
+    renderGuideSteps(getSmartSteps(goal, getUIState(), isEs), goal);
   }
 }
 
@@ -1106,11 +1235,7 @@ function renderGuideSteps(data, goal) {
 
   if (data.steps && data.steps.length) {
     data.steps.forEach((step, i) => {
-      html += `
-        <div class="guide-step">
-          <div class="guide-step-num">${i + 1}</div>
-          <div class="guide-step-content">${step}</div>
-        </div>`;
+      html += `<div class="guide-step"><div class="guide-step-num">${i + 1}</div><div class="guide-step-content">${step}</div></div>`;
     });
   }
 
@@ -1123,24 +1248,17 @@ function renderGuideSteps(data, goal) {
   if (data.highlight) {
     try {
       const el = document.querySelector(data.highlight);
-      if (el) {
-        el.classList.add('guide-highlight');
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
+      if (el) { el.classList.add('guide-highlight'); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
     } catch {}
   }
 
   document.getElementById('guide-actions-bar').innerHTML = `
     <button class="guide-action-btn" onclick="showGuideGoalPicker()">← ${isEs ? 'Nuevo objetivo' : 'New goal'}</button>
-    <button class="guide-action-btn primary" onclick="refreshGuide('${goal}')">↻ ${isEs ? 'Actualizar' : 'Refresh'}</button>
-  `;
+    <button class="guide-action-btn primary" onclick="generateGuideSteps('${goal}')">↻ ${isEs ? 'Actualizar' : 'Refresh'}</button>`;
 }
 
-async function refreshGuide(goal) {
-  await generateGuideSteps(goal);
-}
+async function refreshGuide(goal) { await generateGuideSteps(goal); }
 
-// Re-run guide when user switches tabs (if guide is active)
 const origShowTab = showTab;
 showTab = function(tab) {
   origShowTab(tab);
@@ -1150,19 +1268,51 @@ showTab = function(tab) {
     generateGuideSteps(newGoal);
   }
 };
+
+function getSmartSteps(goal, state, isEs) {
+  if (goal === 'find_clinic') {
+    const hasZip = state.clinics?.zip?.length === 5;
+    const hasResults = state.clinics?.hasResults;
+    if (!hasZip && !hasResults) return {
+      steps: isEs ? ['Veo que estás en "Buscar Clínicas" — ¡empecemos!', 'Escribe tu código postal de 5 dígitos en el campo de búsqueda.', 'Presiona el botón verde "Buscar" para ver clínicas cercanas.', 'Verás clínicas con horarios, idiomas y tarifas según ingresos.'] : ['I can see you\'re on Find Clinics — let\'s start!', 'Type your 5-digit ZIP code in the search field.', 'Press the green Buscar button to find nearby clinics.', 'You\'ll see clinics with hours, languages, and sliding-scale fees.'],
+      highlight: '#zip-input', tip: isEs ? 'Todas las clínicas aceptan pacientes sin seguro.' : 'All clinics accept uninsured patients.'
+    };
+    if (hasZip && !hasResults) return {
+      steps: isEs ? [`Veo que escribiste el código postal ${state.clinics.zip}.`, 'Ahora presiona el botón verde "Buscar".'] : [`I can see you entered ZIP ${state.clinics.zip}.`, 'Now press the green Buscar button.'],
+      highlight: '#search-btn', tip: isEs ? '¡Ya casi!' : 'Almost there!'
+    };
+    return {
+      steps: isEs ? [`¡Encontré ${state.clinics.clinicCount} clínicas cerca de ti!`, 'Cada tarjeta muestra dirección, horarios e idiomas disponibles.', 'La etiqueta naranja significa que puedes pagar según tus ingresos.', 'Llama a la clínica más cercana y menciona que no tienes seguro.'] : [`Found ${state.clinics.clinicCount} clinics near you!`, 'Each card shows address, hours and available languages.', 'The orange tag means you pay based on your income.', 'Call the nearest clinic and mention you are uninsured.'],
+      highlight: '.clinic-card', tip: isEs ? 'Guarda el número de tu clínica favorita.' : 'Save your preferred clinic\'s phone number.'
+    };
+  }
+  if (goal === 'ask_health') return {
+    steps: isEs ? ['Estás en el chat de salud bilingüe.', 'Puedes hablar usando el botón 🎤 o escribir tu pregunta.', 'El asistente entiende español e inglés — usa el que prefieras.', 'Presiona ➤ o Enter para enviar.'] : ['You\'re on the bilingual health chat.', 'Tap the 🎤 button to speak, or type your question.', 'The assistant understands Spanish and English.', 'Press ➤ or Enter to send.'],
+    highlight: '#voice-btn', tip: isEs ? 'El asistente nunca da diagnósticos.' : 'The assistant never diagnoses.'
+  };
+  if (goal === 'prep_appt') return {
+    steps: isEs ? ['Estás preparando tu cita — ¡excelente!', 'Selecciona tu preocupación principal en el menú desplegable.', 'Aparecerá una lista de documentos y preguntas para tu médico.', 'Marca cada elemento cuando lo tengas listo.'] : ['You\'re preparing for your appointment — great!', 'Select your main concern from the dropdown menu.', 'A personalized list of documents and questions will appear.', 'Check each item as you get it ready.'],
+    highlight: '#concern-select', tip: isEs ? 'Siempre lleva una ID con foto.' : 'Always bring a photo ID.'
+  };
+  if (goal === 'understand_data') return {
+    steps: isEs ? ['Estás viendo datos reales de salud de la comunidad hispana.', 'El 18% de adultos hispanos no tiene seguro — 2.7x el promedio nacional.', 'El 38% no tiene médico, pero las clínicas FQHC atienden a todos.', 'Estos datos son la razón por la que existe Salud Fácil.'] : ['You\'re viewing real Hispanic community health data.', '18% of Hispanic adults are uninsured — 2.7x the national average.', '38% have no doctor, but FQHC clinics serve everyone.', 'This data is why Salud Fácil exists.'],
+    highlight: '.stat-card', tip: isEs ? 'Comparte estos datos con tu familia.' : 'Share this data with your family.'
+  };
+  return { steps: isEs ? ['Usa las pestañas de arriba para navegar.'] : ['Use the tabs above to navigate.'], highlight: '.tabs', tip: '' };
+}
 </script>
 
 <button class="guide-fab" id="guide-fab" onclick="toggleGuide()">
   <span class="pulse-dot"></span>
-  <span class="t" data-es="Guíame" data-en="Guide Me">Guíame</span>
+  <span>Guíame</span>
 </button>
 
 <div class="guide-overlay" id="guide-overlay">
   <div class="guide-header">
     <div class="guide-header-icon">🧭</div>
     <div class="guide-header-text">
-      <div class="guide-header-title t" data-es="Guía Interactiva" data-en="Interactive Guide">Guía Interactiva</div>
-      <div class="guide-header-sub t" data-es="Te guío paso a paso" data-en="I'll walk you through it">Te guío paso a paso</div>
+      <div class="guide-header-title">Guía Interactiva</div>
+      <div class="guide-header-sub">Te guío paso a paso</div>
     </div>
   </div>
   <div class="guide-body" id="guide-body"></div>
